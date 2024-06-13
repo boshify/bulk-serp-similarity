@@ -72,7 +72,8 @@ def process_file(file, api_key, cse_id):
         similarity_percentage = calculate_serp_similarity(urls1, urls2)
 
         # Append the results to the output DataFrame
-        output_df = output_df.append({'Keyword 1': keyword1, 'Keyword 2': keyword2, 'SERP Similarity': similarity_percentage}, ignore_index=True)
+        new_row = pd.DataFrame({'Keyword 1': [keyword1], 'Keyword 2': [keyword2], 'SERP Similarity': [similarity_percentage]})
+        output_df = pd.concat([output_df, new_row], ignore_index=True)
 
     return output_df
 
@@ -86,8 +87,12 @@ def main():
     """)
 
     # Use Streamlit secrets for API key and CSE ID
-    api_key = st.secrets["GOOGLE_API_KEY"]
-    cse_id = st.secrets["CUSTOM_SEARCH_ENGINE_ID"]
+    api_key = st.secrets.get("GOOGLE_API_KEY")
+    cse_id = st.secrets.get("CUSTOM_SEARCH_ENGINE_ID")
+
+    # Debug: Print the secrets to ensure they are being loaded
+    st.write("Google API Key: ", api_key)
+    st.write("Custom Search Engine ID: ", cse_id)
 
     uploaded_file = st.file_uploader("Upload your file", type=["csv"])
 
