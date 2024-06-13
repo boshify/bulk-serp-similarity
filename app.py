@@ -46,7 +46,7 @@ def calculate_serp_similarity(urls1, urls2):
     return similarity_percentage
 
 # Function to process the input CSV and generate the output CSV with SERP similarity
-def process_file(file, api_key, cse_id):
+def process_file(file, api_key, cse_id, progress_bar, progress_text, table_placeholder):
     df = pd.read_csv(file)
 
     # Ensure the input CSV has the correct columns
@@ -56,6 +56,7 @@ def process_file(file, api_key, cse_id):
     # Initialize the output DataFrame
     output_df = pd.DataFrame(columns=['Keyword 1', 'Keyword 2', 'SERP Similarity'])
 
+    total_rows = len(df)
     for index, row in df.iterrows():
         keyword1 = row['Keyword 1']
         keyword2 = row['Keyword 2']
@@ -75,6 +76,13 @@ def process_file(file, api_key, cse_id):
         new_row = pd.DataFrame({'Keyword 1': [keyword1], 'Keyword 2': [keyword2], 'SERP Similarity': [similarity_percentage]})
         output_df = pd.concat([output_df, new_row], ignore_index=True)
 
+        # Update progress bar and text
+        progress_bar.progress((index + 1) / total_rows)
+        progress_text.text(f"Processing row {index + 1} of {total_rows}")
+
+        # Update the table in the placeholder
+        table_placeholder.write(output_df)
+
     return output_df
 
 # Streamlit app layout
@@ -90,10 +98,6 @@ def main():
     api_key = st.secrets.get("GOOGLE_API_KEY")
     cse_id = st.secrets.get("CUSTOM_SEARCH_ENGINE_ID")
 
-    # Debug: Print the secrets to ensure they are being loaded
-    st.write("Google API Key: ", api_key)
-    st.write("Custom Search Engine ID: ", cse_id)
-
     uploaded_file = st.file_uploader("Upload your file", type=["csv"])
 
     # Start button - Only show this if a file is uploaded
@@ -101,7 +105,13 @@ def main():
         if st.button('Start Processing'):
             # Ensure API key and CSE ID are available
             if api_key and cse_id:
-                processed_data = process_file(uploaded_file, api_key, cse_id)
+                # Initialize progress bar, progress text, and table placeholder
+                progress_bar = st.progress(0)
+                progress_text = st.empty()
+                table_placeholder = st.empty()
+
+                # Process the file
+                processed_data = process_file(uploaded_file, api_key, cse_id, progress_bar, progress_text, table_placeholder)
 
                 st.write("Processed Data:")
                 st.write(processed_data)
