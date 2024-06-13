@@ -1,3 +1,4 @@
+import streamlit as st
 import pandas as pd
 import requests
 import json
@@ -45,8 +46,8 @@ def calculate_serp_similarity(urls1, urls2):
     return similarity_percentage
 
 # Function to process the input CSV and generate the output CSV with SERP similarity
-def process_file(input_file, output_file, api_key, cse_id):
-    df = pd.read_csv(input_file)
+def process_file(file, api_key, cse_id):
+    df = pd.read_csv(file)
 
     # Ensure the input CSV has the correct columns
     if not {'Keyword 1', 'Keyword 2'}.issubset(df.columns):
@@ -73,18 +74,42 @@ def process_file(input_file, output_file, api_key, cse_id):
         # Append the results to the output DataFrame
         output_df = output_df.append({'Keyword 1': keyword1, 'Keyword 2': keyword2, 'SERP Similarity': similarity_percentage}, ignore_index=True)
 
-    # Save the output DataFrame to a CSV file
-    output_df.to_csv(output_file, index=False)
+    return output_df
 
-# Main function to run the script
+# Streamlit app layout
 def main():
-    api_key = "YOUR_GOOGLE_API_KEY"
-    cse_id = "YOUR_CUSTOM_SEARCH_ENGINE_ID"
-    input_file = "input_keywords.csv"
-    output_file = "serp_similarity_output.csv"
+    st.title("SERP Similarity Checker")
 
-    process_file(input_file, output_file, api_key, cse_id)
-    print(f"Output saved to {output_file}")
+    st.markdown("""
+    ## About the App
+    Upload a CSV with two columns: 'Keyword 1' and 'Keyword 2'. The app will search Google for both keywords and calculate the SERP similarity percentage.
+    """)
+
+    # Use Streamlit secrets for API key and CSE ID
+    api_key = st.secrets["GOOGLE_API_KEY"]
+    cse_id = st.secrets["CUSTOM_SEARCH_ENGINE_ID"]
+
+    uploaded_file = st.file_uploader("Upload your file", type=["csv"])
+
+    # Start button - Only show this if a file is uploaded
+    if uploaded_file is not None:
+        if st.button('Start Processing'):
+            # Ensure API key and CSE ID are available
+            if api_key and cse_id:
+                processed_data = process_file(uploaded_file, api_key, cse_id)
+
+                st.write("Processed Data:")
+                st.write(processed_data)
+
+                # Download button
+                st.download_button(
+                    label="Download processed data",
+                    data=processed_data.to_csv(index=False),
+                    file_name="serp_similarity_output.csv",
+                    mime="text/csv",
+                )
+            else:
+                st.error("API Key or Custom Search Engine ID is missing.")
 
 if __name__ == "__main__":
     main()
