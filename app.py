@@ -4,6 +4,7 @@ import requests
 import json
 from bs4 import BeautifulSoup
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 # Function to perform a search using the Google Custom Search API
 def search(query, api_key, cse_id):
@@ -45,6 +46,24 @@ def calculate_serp_similarity(urls1, urls2):
     similarity_percentage = (len(common_urls) / 10) * 100  # Calculate the percentage based on top 10 results
     return similarity_percentage
 
+# Function to process a single row
+def process_row(row, api_key, cse_id):
+    keyword1 = row['Keyword 1']
+    keyword2 = row['Keyword 2']
+
+    # Perform Google searches for both keywords
+    results1 = search(keyword1, api_key, cse_id)
+    results2 = search(keyword2, api_key, cse_id)
+
+    # Extract URLs from search results
+    urls1 = extract_urls(results1)
+    urls2 = extract_urls(results2)
+
+    # Calculate SERP similarity percentage
+    similarity_percentage = calculate_serp_similarity(urls1, urls2)
+
+    return {'Keyword 1': keyword1, 'Keyword 2': keyword2, 'SERP Similarity': similarity_percentage}
+
 # Function to process the input CSV and generate the output CSV with SERP similarity
 def process_file(file, api_key, cse_id, progress_bar, progress_text, table_placeholder):
     df = pd.read_csv(file)
@@ -57,31 +76,21 @@ def process_file(file, api_key, cse_id, progress_bar, progress_text, table_place
     output_df = pd.DataFrame(columns=['Keyword 1', 'Keyword 2', 'SERP Similarity'])
 
     total_rows = len(df)
-    for index, row in df.iterrows():
-        keyword1 = row['Keyword 1']
-        keyword2 = row['Keyword 2']
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(process_row, row, api_key, cse_id): index for index, row in df.iterrows()}
 
-        # Perform Google searches for both keywords
-        results1 = search(keyword1, api_key, cse_id)
-        results2 = search(keyword2, api_key, cse_id)
+        for future in futures:
+            index = futures[future]
+            result = future.result()
+            new_row = pd.DataFrame([result])
+            output_df = pd.concat([output_df, new_row], ignore_index=True)
 
-        # Extract URLs from search results
-        urls1 = extract_urls(results1)
-        urls2 = extract_urls(results2)
+            # Update progress bar and text
+            progress_bar.progress((index + 1) / total_rows)
+            progress_text.text(f"Processing row {index + 1} of {total_rows}")
 
-        # Calculate SERP similarity percentage
-        similarity_percentage = calculate_serp_similarity(urls1, urls2)
-
-        # Append the results to the output DataFrame
-        new_row = pd.DataFrame({'Keyword 1': [keyword1], 'Keyword 2': [keyword2], 'SERP Similarity': [similarity_percentage]})
-        output_df = pd.concat([output_df, new_row], ignore_index=True)
-
-        # Update progress bar and text
-        progress_bar.progress((index + 1) / total_rows)
-        progress_text.text(f"Processing row {index + 1} of {total_rows}")
-
-        # Update the table in the placeholder
-        table_placeholder.write(output_df)
+            # Update the table in the placeholder
+            table_placeholder.write(output_df)
 
     return output_df
 
